@@ -5,9 +5,9 @@ using UnityEngine;
 public class Room : MonoBehaviour
 {
     public Doorway[] doorways;
-    public MeshCollider meshCollider;
+    public BoxCollider boxCollider;
 
     public Bounds RoomBounds {
-        get { return meshCollider.bounds; }
+        get { return boxCollider.bounds; }
     }
 }

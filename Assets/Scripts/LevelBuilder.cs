@@ -48,11 +48,12 @@ public class LevelBuilder : MonoBehaviour
 
 
         yield return new WaitForSeconds(3);
+        ResetLevelGenerator ();
     }
 
     void PlaceStartRoom(){
         startRoom = Instantiate(startRoomPrefab);
-        startRoom.transform.parent = transform;
+        startRoom.transform.parent = this.transform;
         AddDoorwaysToList(startRoom, availableDoorways);
 
         startRoom.transform.position = Vector3.zero;
@@ -68,9 +69,11 @@ public class LevelBuilder : MonoBehaviour
 
     }
 
+    List<Doorway> currentDoorways;
+
     void PlaceCorridor(){
         Room currentRoom = Instantiate(spawnableRooms[Random.Range(0, spawnableRooms.Count)]) as Room;
-        currentRoom.transform.parent = transform;
+        currentRoom.transform.parent = this.transform;
 
         List<Doorway> allAvailableDoorways = new List<Doorway>(availableDoorways);
         List<Doorway> currentDoorways = new List<Doorway>();
@@ -81,7 +84,7 @@ public class LevelBuilder : MonoBehaviour
 
         foreach(Doorway availableDoorway in allAvailableDoorways){
             foreach(Doorway currentDoorway in currentDoorways){
-                PositionRoomAtDoorway(ref currentRoom, currentDoorway, availableDoorway);
+                PositionRoomAtDoorway(currentRoom, currentDoorway, availableDoorway);
 
                 if(CheckRoomOverlap(currentRoom)){
                     continue;
@@ -104,20 +107,20 @@ public class LevelBuilder : MonoBehaviour
 
         if(!roomPlaced){
             Destroy(currentRoom.gameObject);
-            // ResetLevelGenerator();
+            ResetLevelGenerator();
         }
     }
 
-    void PositionRoomAtDoorway(ref Room room, Doorway roomDoorway, Doorway targetDoorway){
+    void PositionRoomAtDoorway(Room room, Doorway roomDoorway, Doorway targetDoorway){
         room.transform.position = Vector3.zero;
         room.transform.rotation = Quaternion.identity;
 
         Vector3 targetDoorwayEuler = targetDoorway.transform.eulerAngles;
         Vector3 roomDoorwayEuler = roomDoorway.transform.eulerAngles;
 
-        float deltaAngle = Mathf.DeltaAngle(roomDoorwayEuler.y, roomDoorwayEuler.y);
+        float deltaAngle = Mathf.DeltaAngle(roomDoorwayEuler.y, targetDoorwayEuler.y);
         Quaternion currentRoomTargetRotation = Quaternion.AngleAxis(deltaAngle, Vector3.up);
-        room.transform.rotation = currentRoomTargetRotation * Quaternion.Euler(0, 100f, 0);
+        room.transform.rotation = currentRoomTargetRotation * Quaternion.Euler(0, 180f, 0);
 
         Vector3 roomPositionOffset = roomDoorway.transform.position - room.transform.position;
         room.transform.position = targetDoorway.transform.position - roomPositionOffset;
@@ -126,13 +129,16 @@ public class LevelBuilder : MonoBehaviour
     }
 
     bool CheckRoomOverlap(Room room){
-        Bounds bounds = room.RoomBounds;
-        bounds.Expand (-0.1f);
+        // Bounds bounds = room.RoomBounds;
+        // bounds.Expand (-1f);
 
-        Collider[] colliders = Physics.OverlapBox(bounds.center, bounds.size / 2, room.transform.rotation, roomLayerMask);
+        BoxCollider boxCollider = room.GetComponent<BoxCollider>();
+
+        Collider[] colliders = Physics.OverlapBox(room.transform.position, boxCollider.size / 2, Quaternion.identity, roomLayerMask);
 
         if(colliders.Length > 0) {
             foreach(Collider c in colliders){
+                print(c.transform.parent.gameObject.Equals(room.gameObject));
                 if(c.transform.parent.gameObject.Equals(room.gameObject)){
                     continue;
                 } else {
@@ -146,7 +152,43 @@ public class LevelBuilder : MonoBehaviour
     }
 
     void PlaceEndRoom(){
+        Room currentRoom = Instantiate(endRoomPrefab) as Room;
+        currentRoom.transform.parent = this.transform;
 
+        List<Doorway> allAvailableDoorways = new List<Doorway>(availableDoorways);
+        List<Doorway> currentDoorways = new List<Doorway>();
+        AddDoorwaysToList(currentRoom, currentDoorways);
+        AddDoorwaysToList(currentRoom, availableDoorways);
+
+        bool roomPlaced = false;
+
+        foreach(Doorway availableDoorway in allAvailableDoorways){
+            foreach(Doorway currentDoorway in currentDoorways){
+                PositionRoomAtDoorway(currentRoom, currentDoorway, availableDoorway);
+
+                if(CheckRoomOverlap(currentRoom)){
+                    continue;
+                }
+
+                roomPlaced = true;
+                placedRooms.Add(currentRoom);
+
+                currentDoorway.gameObject.SetActive(false);
+                availableDoorways.Remove(currentDoorway);
+
+                availableDoorway.gameObject.SetActive(false);
+                availableDoorways.Remove(availableDoorway);
+
+                break;
+            }
+
+            if(roomPlaced) break;
+        }
+
+        if(!roomPlaced){
+            Destroy(currentRoom.gameObject);
+            ResetLevelGenerator();
+        }
     }
 
     void ResetLevelGenerator(){
@@ -164,5 +206,6 @@ public class LevelBuilder : MonoBehaviour
 
         placedRooms.Clear();
         availableDoorways.Clear();
+        StartCoroutine(GenerateLevel());
     }
 }
